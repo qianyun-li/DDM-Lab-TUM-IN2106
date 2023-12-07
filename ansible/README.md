@@ -1,6 +1,7 @@
 • Install Ansible
 
 • Edit Ansible host file, for Ubuntu it can be found in /etc/ansible
+
 • Add at the end:
 
 [master]
