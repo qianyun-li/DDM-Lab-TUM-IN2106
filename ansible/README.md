@@ -4,6 +4,7 @@
 
 • Add at the end:
 
+```
 [master]
 master-ip
 
@@ -17,5 +18,7 @@ worker-ips
 [workers:vars]
 ansible_ssh_user=ubuntu
 ansible_ssh_private_key_file=<path-to-private-key>
+
+```
 
 Store hadoop installation file in a folder data
