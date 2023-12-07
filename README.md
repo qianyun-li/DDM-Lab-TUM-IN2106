@@ -1,4 +1,4 @@
-# Advanced Practical Course Distributed Data Mining Lab Course (IN2106)
+# Advanced Practical Course: Distributed Data Mining Lab Course (IN2106)
 
   The repository includes:
   * Weekly learning notes
