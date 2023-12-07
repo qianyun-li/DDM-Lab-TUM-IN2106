@@ -21,4 +21,4 @@ ansible_ssh_private_key_file=<path-to-private-key>
 
 ```
 
-Store hadoop installation file in a folder data
+* Store hadoop installation file in a folder data
