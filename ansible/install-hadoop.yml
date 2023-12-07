@@ -1,0 +1,270 @@
+---
+
+- name: Installation of Java and Hadoop
+  hosts: all
+  tags: all
+  vars_files:
+    - vars/external_vars.yml
+  tasks:
+# Installation of Java and Hadoop
+  # Installation and changed PATH of Java
+    - name: Update repositories and install Java
+      become_user: root
+      become: yes
+      apt:
+        name: openjdk-8-jdk
+        update_cache: yes
+
+    - name: Edit bashrc
+      blockinfile:
+        path: ~/.bashrc
+        block: |
+          export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
+          export PATH=$PATH:$JAVA_HOME/bin
+        marker: "# {mark} ANSIBLE MANAGED BLOCK JAVA"
+
+  # Installation and changed PATH of Hadoop
+    - name: Install unzip
+      become_user: root
+      become: yes
+      package:
+        name: unzip
+
+    - name: Install and unzip Hadoop
+      unarchive:
+        src: https://archive.apache.org/dist/hadoop/common/hadoop-2.7.3/hadoop-2.7.3.tar.gz
+        dest: /home/ubuntu
+        remote_src: yes
+
+    - name: Add Hadoop to bashrc
+      blockinfile:
+        path: ~/.bashrc
+        block: |
+          export HADOOP_HOME=/home/ubuntu/hadoop-2.7.3
+          export PATH=$PATH:$HADOOP_HOME/bin:$HADOOP_HOME/sbin
+        marker: "# {mark} ANSIBLE MANAGED BLOCK HADOOP"
+
+    # checking hadoop version is not possible, because ~/.bashrc is only loaded in interactive mode
+    #- name: Check Hadoop version
+      #shell: hadoop version
+      #register: hadoop_output
+    #- debug:
+        #var: hadoop_output
+
+
+- name: Configuration of Hadoop - Master
+  hosts: master
+  tags: master, hadoop, config
+  vars_files:
+    - vars/external_vars.yml
+  tasks:
+
+    - name: Create /home/hadoop/data/tmp directory
+      become_user: root
+      become: yes
+      become_user: root
+      become: yes
+      file:
+        path: /home/hadoop/data/tmp
+        state: directory
+    - name: Change ownership for  /home/hadoop/data/tmp directory
+      become_user: root
+      become: yes
+      shell: sudo chown ubuntu:ubuntu -R /home/hadoop/data/tmp
+    - name: Change permission for  /home/hadoop/data/tmp directory
+      become_user: root
+      become: yes
+      shell: sudo chmod 777 /home/hadoop/data/tmp
+
+# Hadoop Configuration
+  # on master node
+    - name: Edit core-site.xml
+      blockinfile:
+        path: ~/hadoop-2.7.3/etc/hadoop/core-site.xml
+        insertafter: <configuration>
+        block: |
+          <property>
+            <name>fs.default.name</name>
+            <value>hdfs://master:9000</value>
+          </property>
+
+          <property>
+            <name>mapred.job.tracker</name>
+            <value>master:54311</value>
+          </property>
+
+          <property>
+            <name>mapreduce.framework.name</name>
+            <value>yarn</value>
+          </property>
+
+          <property>
+            <name>yarn.resourcemanager.address</name>
+            <value>master:8050</value>
+          </property>
+
+          <property>
+            <name>hadoop.tmp.dir</name>
+            <value>/home/hadoop/data/tmp</value>
+          </property>
+        marker: "<!-- {mark} ANSIBLE MANAGED BLOCK core-site -->"
+
+    - name: Edit hdfs-site.xml
+      blockinfile:
+        path: ~/hadoop-2.7.3/etc/hadoop/hdfs-site.xml
+        insertafter: <configuration>
+        block: |
+          <property>
+            <name>dfs.replication</name>
+            <value>1</value>
+          </property>
+          <property>
+            <name>dfs.namenode.name.dir</name>
+            <value>file:/usr/local/hadoop_tmp/hdfs/namenode</value>
+          </property>
+          <property>
+            <name>dfs.datanode.data.dir</name>
+            <value>file:/usr/local/hadoop_tmp/hdfs/datanode</value>
+          </property>
+        marker: "<!-- {mark} ANSIBLE MANAGED BLOCK hdfs-site -->"
+    - name: Create /usr/local/hadoop_tmp/hdfs/namenode directory
+      become_user: root
+      become: yes
+      file:
+        path: /usr/local/hadoop_tmp/hdfs/namenode
+        state: directory
+    - name: Change ownership for namenode folder
+      shell: sudo chown ubuntu:ubuntu -R /usr/local/hadoop_tmp/
+    - name: Change permission for namenode folder
+      shell: sudo chmod 777 /usr/local/hadoop_tmp/hdfs/namenode/
+
+
+    - name: Copy the template of mapred-site.xml
+      shell: cp ~/hadoop-2.7.3/etc/hadoop/mapred-site.xml.template ~/hadoop-2.7.3/etc/hadoop/mapred-site.xml
+    - name: Edit mapred-site.xml
+      blockinfile:
+        path: ~/hadoop-2.7.3/etc/hadoop/mapred-site.xml
+        insertafter: <configuration>
+        block: |
+          <property>
+            <name>mapred.job.tracker</name>
+            <value>master:54311</value>
+          </property>
+          <property>
+            <name>mapreduce.framework.name</name>
+            <value>yarn</value>
+          </property>
+        marker: "<!-- {mark} ANSIBLE MANAGED BLOCK mapred-site -->"
+
+    - name: Edit yarn-site.xml
+      blockinfile:
+        path: ~/hadoop-2.7.3/etc/hadoop/yarn-site.xml
+        insertafter: <configuration>
+        block: |
+          <property>
+            <name>yarn.nodemanager.aux-services</name>
+            <value>mapreduce_shuffle</value>
+          </property>
+          <property>
+            <name>yarn.nodemanager.aux-services.mapreduce.shuffle.class</name>
+            <value>org.apache.hadoop.mapred.ShuffleHandler</value>
+          </property>
+          <property>
+            <name>yarn.resourcemanager.scheduler.address</name>
+            <value>master:8030</value>
+          </property>
+          <property>
+            <name>yarn.resourcemanager.address</name>
+            <value>master:8050</value>
+          </property>
+          <property>
+            <name>yarn.resourcemanager.resource-tracker.address</name>
+            <value>master:8025</value>
+          </property>
+          <property>
+            <name>yarn.resourcemanager.webapp.address</name>
+            <value>master:8088</value>
+          </property>
+
+          <property>
+            <name>yarn.log-aggregation-enable</name>
+            <value>true</value>
+          </property>
+          <property>
+            <description>Where to aggregate logs to.</description>
+            <name>yarn.nodemanager.remote-app-log-dir</name>
+            <value>/tmp/logs</value>
+          </property> 
+           <property>
+            <name>yarn.nodemanager.log-aggregation.roll-monitoring-interval-seconds</name>
+            <value>3600</value>
+          </property>
+        marker: "<!-- {mark} ANSIBLE MANAGED BLOCK yarn-site -->"
+
+    - name: Edit hadoop-env.sh
+      tags: hadoop_config, hadoop-env.sh
+      lineinfile:
+        path: ~/hadoop-2.7.3/etc/hadoop/hadoop-env.sh
+        regexp: '^export JAVA_HOME'
+        line: export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
+
+    - name: Create masters File if it does not already exist
+      ignore_errors: yes
+      file:
+        path: ~/hadoop-2.7.3/etc/hadoop/masters
+        state: touch
+    - name: Edit Masters file
+      blockinfile:
+        path: ~/hadoop-2.7.3/etc/hadoop/masters
+        block: |
+          {{ item.hostname }}
+        marker: "# ANSIBLE MANAGED BLOCK MASTERS"
+      with_items: "{{ master_node }}"
+    - name: Remove current Slaves file
+      file:
+        path: ~/hadoop-2.7.3/etc/hadoop/slaves
+        state: absent
+    - name: Create new Slaves file
+      file:
+        path: ~/hadoop-2.7.3/etc/hadoop/slaves
+        state: touch
+    - name: Create entries in Slave files
+      blockinfile:
+        path: ~/hadoop-2.7.3/etc/hadoop/slaves
+        block: |
+          {{ item.hostname }}
+        marker: "# ANSIBLE MANAGED BLOCK SLAVES"
+      with_items: "{{ worker_nodes }}"
+
+  #Copy to Workers
+    - name: Copy configuration files to all workers
+      tags: scp
+      shell: scp ~/hadoop-2.7.3/etc/hadoop/masters ~/hadoop-2.7.3/etc/hadoop/slaves ~/hadoop-2.7.3/etc/hadoop/hadoop-env.sh ~/hadoop-2.7.3/etc/hadoop/core-site.xml ~/hadoop-2.7.3/etc/hadoop/hdfs-site.xml ~/hadoop-2.7.3/etc/hadoop/mapred-site.xml ~/hadoop-2.7.3/etc/hadoop/yarn-site.xml ubuntu@{{item.ip}}:~/hadoop-2.7.3/etc/hadoop/.
+      with_items: "{{ worker_nodes }}"
+
+  #Format Name Node
+    - name: Format namenode
+      tags: format
+      shell: ~/hadoop-2.7.3/bin/hdfs namenode -format
+
+  - name: Configuration of Hadoop - Workers
+    hosts: workers
+    tags: workers, hadoop, config
+    vars_files:
+      - vars/external_vars.yml
+    tasks:
+      - name: Create /usr/local/hadoop_tmp/hdfs/datanode directory
+        become_user: root
+        become: yes
+        file:
+          path: /usr/local/hadoop_tmp/hdfs/datanode
+          state: directory
+      - name: Change ownership for datanode folder
+        shell: sudo chown ubuntu:ubuntu -R /usr/local/hadoop_tmp/
+      - name: Change permission for datanode folder
+        shell: sudo chmod 777 /usr/local/hadoop_tmp/hdfs/datanode/
+
+
+
+
+  

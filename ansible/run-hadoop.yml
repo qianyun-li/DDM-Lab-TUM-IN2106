@@ -1,0 +1,17 @@
+---
+- name: Start Hadoop on Hadoop - Masters
+  hosts: master
+  tags: master
+  vars_files:
+    - vars/external_vars.yml
+  tasks:
+    - name: Start Hadoop environment
+      shell: ~/hadoop-2.7.3/sbin/start-dfs.sh
+      register: hadoop_log
+    - debug:
+        var: hadoop_log.stdout_lines
+    - name: Start YARN
+      shell: ~/hadoop-2.7.3/sbin/start-yarn.sh
+      register: yarn_log
+    - debug:
+        var: yarn_log.stdout_lines

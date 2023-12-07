@@ -1,0 +1,117 @@
+---
+
+- name: Installation of Spark
+  hosts: all
+  tags: all
+  tasks:
+  # Download Spark
+    - name: Check if Spark exists
+      stat:
+        path: /home/ubuntu/spark
+      register: spark_directory
+    - name: Download Spark
+      unarchive:
+        src: https://downloads.apache.org/spark/spark-2.4.8/spark-2.4.8-bin-hadoop2.7.tgz
+        dest: /home/ubuntu
+        remote_src: yes
+      when: not spark_directory.stat.exists
+    - name: Change name
+      shell: mv spark-2.4.8-bin-hadoop2.7 spark
+      when: not spark_directory.stat.exists
+    - name: Edit bashrc
+      blockinfile:
+        path: ~/.bashrc
+        block: |
+          export SPARK_HOME=/home/ubuntu/spark
+          export PATH=$PATH:$SPARK_HOME/bin
+        marker: "# {mark} ANSIBLE MANAGED BLOCK SPARK"
+
+- name: Configuration of Spark - Master
+  hosts: master
+  tags: master, spark, config
+  vars_files:
+    - vars/external_vars.yml
+  tasks:
+    - name: Check if spark-env.sh exists
+      stat:
+        path: /home/ubuntu/spark/conf/spark-env.sh
+      register: spark_env_exists
+    - name: Create spark-env.sh
+      shell: cp /home/ubuntu/spark/conf/spark-env.sh.template /home/ubuntu/spark/conf/spark-env.sh
+      when: not spark_env_exists.stat.exists
+    - name: Add Master node to spark-env.sh
+      blockinfile:
+        path: ~/spark/conf/spark-env.sh
+        block: |
+          SPARK_MASTER_HOST='{{ item.ip }}'
+          HADOOP_CONF_DIR="/home/ubuntu/hadoop-2.7.3/etc/hadoop"
+          SPARK_YARN_QUEUE="default"
+        marker: "#{mark} ANSIBLE MANAGED BLOCK MASTERS"
+      with_items: "{{ master_node }}"
+    - name: Create workers File if it does not already exist
+      ignore_errors: yes
+      file:
+        path: ~/spark/conf/slaves
+        state: touch
+    - name: Edit workers file
+      blockinfile:
+        path: ~/spark/conf/slaves
+        block: |
+          {{ item.hostname }}
+        marker: "#{mark} ANSIBLE MANAGED BLOCK {{ item.hostname }}"
+      with_items: "{{ worker_nodes }}"
+    - name: Copy configuration files to workers
+      tags: scp
+      shell: scp ~/spark/conf/spark-env.sh ~/spark/conf/slaves ubuntu@{{item.hostname}}:/home/ubuntu/spark/conf/
+      with_items: "{{ worker_nodes }}"
+
+- name: Start Spark - Master
+  hosts: master
+  tags: master, start
+  vars_files:
+    - vars/external_vars.yml
+  tasks:
+    - name: start the master node of Spark
+      shell: ./~/spark/sbin/start-master.sh
+    - name: start the worker nodes of Spark
+      shell: ./~/spark/sbin/start-slaves.sh
+
+- name: Configuration of Spark about the logs - Master
+  hosts: master
+  tags: master, logs, config
+  vars_files:
+    - vars/external_vars.yml
+  tasks:
+    - name: Create the  hdfs:///spark/events  directory
+      shell: ~/hadoop-2.7.3/bin/hdfs dfs -mkdir -p /spark/events
+
+- name: Configuration of Spark about the logs - All
+  hosts: all
+  tags: all, logs
+  vars_files:
+    - vars/external_vars.yml
+  tasks:
+    - name: Copy the template of spark-defaults.conf.template
+      shell: cp ~/spark/conf/spark-defaults.conf.template ~/spark/conf/spark-defaults.conf
+    - name: Edit spark-defaults.conf
+      blockinfile:
+        path: ~/spark/conf/spark-defaults.conf
+        block: |
+          spark.eventLog.enabled   true        
+          spark.eventLog.dir       hdfs:///spark/events  
+          spark.eventLog.compress  true
+          spark.eventLog.permissions=777
+          spark.history.fs.logDirectory  hdfs:///spark/events 
+          spark.history.fs.cleaner.enabled true 
+          spark.history.fs.cleaner.interval 2d
+          spark.history.fs.cleaner.maxAge 7d
+        marker: "<!-- {mark} ANSIBLE MANAGED BLOCK spark-defaults.conf -->"
+
+- name: Start the history server - Master
+  hosts: master, start, history
+  tags: master, master
+  vars_files:
+    - vars/external_vars.yml
+  tasks:
+    - name: Start the history server
+      shell: ./~/spark/sbin/start-history-server.sh 

@@ -1,0 +1,20 @@
+- nodes:
+    - { hostname: master, ip: 192.168.2.24 }
+    - { hostname: worker1, ip: 192.168.3.101 }
+    - { hostname: worker2, ip: 192.168.2.85 }
+    - { hostname: worker3, ip: 192.168.0.196 }
+    - { hostname: worker4, ip: 192.168.1.202 }
+    - { hostname: worker5, ip: 192.168.3.102 }
+
+- master_for_sec:
+    - { hostname: SecNN, ip: 0.0.0.0 }
+
+- master_node:
+    - { hostname: master, ip: 192.168.2.24 }
+
+- worker_nodes:
+    - { hostname: worker1, ip: 192.168.3.101 }
+    - { hostname: worker2, ip: 192.168.2.85 }
+    - { hostname: worker3, ip: 192.168.0.196 }
+    - { hostname: worker4, ip: 192.168.1.202 }
+    - { hostname: worker5, ip: 192.168.3.102 }

@@ -1,0 +1,164 @@
+- name: Configuration of Hadoop - Master
+  hosts: master
+  tags: master, hadoop, config
+  vars_files:
+    - vars/external_vars.yml
+  tasks:
+    - name: Copy the template of mapred-site.xml
+      shell: cp ~/hadoop-2.7.3/etc/hadoop/mapred-site.xml.template ~/hadoop-2.7.3/etc/hadoop/mapred-site.xml
+    - name: Edit mapred-site.xml
+      blockinfile:
+        path: ~/hadoop-2.7.3/etc/hadoop/mapred-site.xml
+        insertafter: <configuration>
+        block: |
+          <property>
+            <name>mapred.job.tracker</name>
+            <value>master:54311</value>
+          </property>
+
+          <property>
+            <name>mapreduce.framework.name</name>
+            <value>yarn</value>
+          </property>
+        marker: "<!-- {mark} ANSIBLE MANAGED BLOCK mapred-site -->"
+
+    # - name: Copy the template of mapred-site.xml
+    #   shell: cp ~/hadoop-2.7.3/etc/hadoop/mapred-site.xml.template ~/hadoop-2.7.3/etc/hadoop/mapred-site.xml
+    # - name: Edit mapred-site.xml
+    #   blockinfile:
+    #     path: ~/hadoop-2.7.3/etc/hadoop/mapred-site.xml
+    #     insertafter: <configuration>
+    #     block: |
+    #       <property>
+    #         <name>mapreduce.reduce.shuffle.memory.limit.percent</name>
+    #         <value>0.1</value>
+    #       </property>
+
+    #       <property>
+    #         <name>mapreduce.reduce.shuffle.input.buffer.percent</name>
+    #         <value>0.5</value>
+    #       </property>
+
+    #       <property>
+    #         <name>mapreduce.reduce.shuffle.parallelcopies</name>
+    #         <value>3</value>
+    #       </property>
+
+    #       <property>
+    #         <name>mapred.job.tracker</name>
+    #         <value>master:54311</value>
+    #       </property>
+
+    #       <property>
+    #         <name>mapreduce.framework.name</name>
+    #         <value>yarn</value>
+    #       </property>
+
+    #       <property>
+    #         <name>mapred.local.dir</name>
+    #         <value>/temp1,/temp2,/temp3</value>
+    #       </property>
+    #     marker: "<!-- {mark} ANSIBLE MANAGED BLOCK mapred-site -->"
+
+    # - name: Create /temp1 directory
+    #   become_user: root
+    #   become: yes
+    #   file:
+    #     path: /temp1
+    #     state: directory
+    # - name: Change ownership for  /tmp1 directory
+    #   shell: sudo chown ubuntu:ubuntu -R /temp1
+    # - name: Change permission for  /tmp1 directory
+    #   shell: sudo chmod 777 /temp1
+
+    # - name: Create /temp2 directory
+    #   become_user: root
+    #   become: yes
+    #   file:
+    #     path: /temp2
+    #     state: directory
+    # - name: Change ownership for  /temp2 directory
+    #   shell: sudo chown ubuntu:ubuntu -R /temp2
+    # - name: Change permission for  /temp2 directory
+    #   shell: sudo chmod 777 /temp2
+
+    # - name: Create /temp3 directory
+    #   become_user: root
+    #   become: yes
+    #   file:
+    #     path: /temp3
+    #     state: directory
+    # - name: Change ownership for  /tmp3 directory
+    #   shell: sudo chown ubuntu:ubuntu -R /temp3
+    # - name: Change permission for  /tmp3 directory
+    #   shell: sudo chmod 777 /temp3
+
+
+    - name: Edit core-site.xml
+      blockinfile:
+        path: ~/hadoop-2.7.3/etc/hadoop/core-site.xml
+        insertafter: <configuration>
+        block: |
+
+          <property>
+            <name>fs.default.name</name>
+            <value>hdfs://master:9000</value>
+          </property>
+
+          <property>
+            <name>mapred.job.tracker</name>
+            <value>master:54311</value>
+          </property>
+
+          <property>
+            <name>mapreduce.framework.name</name>
+            <value>yarn</value>
+          </property>
+
+          <property>
+            <name>yarn.resourcemanager.address</name>
+            <value>master:8050</value>
+          </property>
+        marker: "<!-- {mark} ANSIBLE MANAGED BLOCK core-site -->"
+
+    # - name: Edit hdfs-site.xml
+    #   blockinfile:
+    #     path: ~/hadoop-2.7.3/etc/hadoop/hdfs-site.xml
+    #     insertafter: <configuration>
+    #     block: |
+    #       <property>
+    #         <name>fs.defaultFS</name>
+    #         <value>hdfs://master:9000</value>
+    #       </property>
+    #     marker: "<!-- {mark} ANSIBLE MANAGED BLOCK hdfs-site -->"
+
+    # - name: Edit yarn-site.xml
+    #   blockinfile:
+    #     path: ~/hadoop-2.7.3/etc/hadoop/yarn-site.xml
+    #     insertafter: <configuration>
+    #     block: |
+    #       <property>
+    #         <name>yarn.log-aggregation-enable</name>
+    #         <value>true</value>
+    #       </property>
+
+    #       <property>
+    #         <description>Where to aggregate logs to.</description>
+    #         <name>yarn.nodemanager.remote-app-log-dir</name>
+    #         <value>/tmp/logs</value>
+    #       </property> 
+
+    #        <property>
+    #         <name>yarn.nodemanager.log-aggregation.roll-monitoring-interval-seconds</name>
+    #         <value>3600</value>
+    #       </property>
+    #     marker: "<!-- {mark} ANSIBLE MANAGED BLOCK mapred-site -->"
+
+
+  #Copy to Workers
+    - name: Copy Revised Configuration Files to all workers
+      tags: scp
+      # shell: scp ~/hadoop-2.7.3/etc/hadoop/hdfs-site.xml ~/hadoop-2.7.3/etc/hadoop/mapred-site.xml ~/hadoop-2.7.3/etc/hadoop/core-site.xml ubuntu@{{item.ip}}:~/hadoop-2.7.3/etc/hadoop/.
+      shell: scp ~/hadoop-2.7.3/etc/hadoop/mapred-site.xml ~/hadoop-2.7.3/etc/hadoop/core-site.xml ubuntu@{{item.ip}}:~/hadoop-2.7.3/etc/hadoop/.
+      with_items: "{{ worker_nodes }}"
+      

@@ -1,0 +1,77 @@
+---
+# This playbook is used to help establish the SSH connection between nodes.
+
+- hosts: all
+  tags: all
+  vars_files:
+    - vars/external_vars.yml
+  pre_tasks: 
+    - name: Add mappings to /etc/hosts file
+      become: yes
+      become_user: root
+      blockinfile:
+        path: /etc/hosts
+        block: |
+          {{ item.ip }} {{ item.hostname }}
+        marker: "# {mark} ANSIBLE MANAGED BLOCK {{ item.hostname }}"
+      with_items: "{{ nodes }}"
+
+
+- name: SSH Connection - Master
+  hosts: master
+  tags: ssh, master
+  vars_files:
+    - vars/external_vars.yml
+  tasks:
+    - name: SSH KeyGen command
+      tags: run
+      shell: ssh-keygen -t rsa -N "" -C "creating SSH" -f ~/.ssh/id_rsa creates="~/.ssh/id_rsa"
+
+    - name: Fetch public keyfile from master server
+      fetch:
+        src: "~/.ssh/id_rsa.pub"
+        dest: "files/id_rsa.pub"
+        flat: yes
+
+    - name: Fetch private keyfile from master server
+      fetch:
+        src: "~/.ssh/id_rsa"
+        dest: "files/id_rsa"
+        flat: yes
+
+    - name: Update authorized_hosts
+      shell: "cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys"
+
+    - name: Add Nodes to known hosts
+      tags: known_hosts_mas
+      shell: ssh-keyscan -H {{ item.ip }} >> ~/.ssh/known_hosts
+      with_items: 
+        - "{{ nodes }}"
+        - "{{ master_for_sec }}" # for Secondary Name Node
+
+
+- name: SSH Connection - Worker Nodes
+  hosts: workers
+  tags: ssh, workers
+  vars_files:
+    - vars/external_vars.yml
+  tasks:
+    - name: Copy the public key to worker nodes
+      copy:
+        src: files/id_rsa.pub
+        dest: ~/.ssh/id_rsa.pub
+
+    - name: Copy the private key to worker nodes
+      copy:
+        src: files/id_rsa
+        dest: ~/.ssh/id_rsa
+        mode: 0400
+
+    - name: Update authorized_hosts
+      shell: "cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys"
+
+    - name: Add Nodes to known hosts
+      tags: knwon_hosts, workers
+      # hashed host IP
+      shell: ssh-keyscan -H {{ item.ip }} >> ~/.ssh/known_hosts
+      with_items: "{{ nodes }}"
